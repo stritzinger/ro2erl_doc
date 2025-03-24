@@ -170,13 +170,16 @@ The Bridge component operates on the local network and serves as the entry/exit 
 - Detects and monitors Hub node availability within its Erlang cluster
 - Provides message dispatch functionality
 - Applies message filtering based on Hub-provided rules
+- Supports attachment to multiple Hub nodes simultaneously
+- Forwards messages to all connected Hubs
 - Future capabilities:
   - Network traffic inspection for ROS2/DDS/RTPS packets
   - Local network traffic generation
 
 #### Connection Management
-- The Bridge does NOT establish or maintain the Erlang distribution connection to the Hub
-- Connection/reconnection is delegated to the parent application using ro2erl_bridge as a dependency
+- The Bridge does NOT establish or maintain the low-level Erlang distribution connection to the Hub
+- The Bridge implements a higher-level protocol for hub attachment and detachment
+- Low-level connection/reconnection is delegated to the parent application using ro2erl_bridge as a dependency
 - For grisp.io framework users, this is handled by grisp_connect
 - ro2erl_bridge does not depend on grisp_connect, making it usable by any Erlang application
 
@@ -185,6 +188,7 @@ The Bridge component operates on the local network and serves as the entry/exit 
    - Receives parsed messages from rosie_rclerl client
    - Dispatches messages as if they originated from the local network
    - Configurable callback for receiving messages from the Hub
+   - Forwards messages to all attached Hubs
 
 2. **Network Mode** (Future Implementation)
    - Listens to local network traffic
@@ -213,8 +217,8 @@ The Hub component runs as a Braid service in the grisp.io cloud platform, packag
    - Updates metrics/statistics
    - Applies filter rules
    - Updates filtering outcome metrics
-3. Bridge forwards message to Hub
-4. Hub distributes message to all connected Bridges
+3. Bridge forwards message to all attached Hubs
+4. Each Hub distributes message to its connected Bridges
 5. Receiving Bridges process message:
    - Update statistics/metrics
    - Call configured dispatch callback
