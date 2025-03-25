@@ -7,7 +7,6 @@ This document outlines the necessary prerequisites for working with and deployin
 ### ro2erl_bridge Requirements
 
 - **Erlang/OTP**: Version 27 or later
-- **ROS2**: Galactic or newer
 - **Network**: Ability to establish outbound connections (no inbound connections required)
 - **rosie_rclerl**: ROS2 Client Library in Erlang
 
@@ -45,8 +44,8 @@ For development work on the Target-X project components, the following tools are
 The project relies on the following key external dependencies:
 
 - **rosie_rclerl**: ROS Client Library in Erlang ([GitHub Repository](https://github.com/rosie-project/rosie_rclerl))
-- **grisp_connect**: For bridge clients connecting to the hub *(part of the grisp.io framework)*
-- **braid_node**: For hub deployment in the grisp.io cloud platform
+- **grisp_connect**: For bridge clients connecting to the hub ([GitHub Repository](https://github.com/grisp/grisp_connect)) *(part of the grisp.io framework)*
+- **braid_node**: For hub deployment in the grisp.io cloud platform ([GitHub Repository](https://github.com/stritzinger/braidnode)) *(part of the grisp.io framework)*
 
 Additional dependencies are specified in each component's `rebar.config` file.
 
