@@ -79,6 +79,43 @@ The Target-X system leverages Erlang distribution as the core mechanism for comm
 - This separation of concerns allows Target-X to focus on its core functionality
 - The system benefits from the mature, battle-tested Erlang distribution protocol
 
+#### Bridge-Hub API
+The communication between Bridge and Hub components follows a well-defined API:
+
+##### Bridge to Hub Messages
+1. **Attach**
+   ```erlang
+   gen_statem:cast(HubPid, {bridge_attach, BridgeId :: binary(), BridgePid :: pid()})
+   ```
+   - Sent by bridge to register with the hub
+   - Hub responds by monitoring the bridge and storing its information
+   - Bridge should send this message after discovering the hub
+
+2. **Detach**
+   ```erlang
+   gen_statem:cast(HubPid, {bridge_detach, BridgePid :: pid()})
+   ```
+   - Sent by bridge to unregister from the hub
+   - Hub responds by removing the bridge and cleaning up monitoring
+   - Bridge should send this message before shutting down
+
+3. **Dispatch**
+   ```erlang
+   gen_statem:cast(HubPid, {bridge_dispatch, BridgePid :: pid(), Timestamp :: integer(), Message :: term()})
+   ```
+   - Sent by bridge to forward a message to other bridges
+   - Hub forwards the message to all connected bridges except the sender
+   - Bridge should include current timestamp in milliseconds
+
+##### Hub to Bridge Messages
+1. **Dispatch**
+   ```erlang
+   gen_statem:cast(BridgePid, {hub_dispatch, Timestamp :: integer(), Message :: term()})
+   ```
+   - Sent by hub to forward messages from other bridges
+   - Bridge should process the message and forward it to its network
+   - Timestamp indicates when the original message was sent
+
 #### Reliability
 - Erlang distribution provides built-in reliability mechanisms
 - Message delivery guarantees help maintain system integrity
