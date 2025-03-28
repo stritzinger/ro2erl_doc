@@ -46,28 +46,342 @@ The ro2erl_hub application includes a web frontend that provides monitoring and 
 
 ## Hub/Frontend Integration
 
-The specific integration mechanisms between the ro2erl_hub backend and the frontend will be determined during the implementation phase. The options outlined below are preliminary suggestions intended as a starting point for further design discussions.
+The hub will provide a WebSocket interface with JSON-RPC for the frontend to connect and receive topic data, bridge status, and system metrics. This approach enables real-time updates and bidirectional communication between the frontend and the hub.
 
-### Potential API Approaches
+### WebSocket API
 
-#### REST API Option
-A RESTful API could provide structured data access with endpoints such as:
-- `GET /api/bridges` - List connected bridges
-- `GET /api/topics` - List active topics
-- `GET /api/rules` - List bandwidth rules
-- `POST /api/rules` - Create/update rules
-- `DELETE /api/rules/:id` - Remove/disable rules
+#### Authentication
+The WebSocket endpoint will be accessible at:
+```
+ws://<server>/ro2erl_hub/ws?token=<AUTH_TOKEN>
+```
 
-#### WebSocket Option
-For real-time updates, WebSockets could be employed to push data to the frontend:
-- Event-based updates for bridge status changes
-- Periodic updates for topic metrics
-- System-wide statistics updates
+Where:
+- `<server>` is the host and port of the ro2erl_hub server
+- `<AUTH_TOKEN>` is the secret token configured in the hub's environment variables
 
-The final API design will be determined during implementation, considering factors such as performance requirements, development complexity, and specific use cases for the first milestone.
+The token authentication is simple to implement and use, while still providing basic security. The token must match the one configured in the hub for the connection to be established. No additional authentication steps are needed once the WebSocket connection is established.
 
-### Data Models
-The data structures exchanged between the frontend and backend will be defined during implementation, with focus on providing the minimal necessary information to support the first milestone functionality.
+#### JSON-RPC Protocol
+The WebSocket API follows the JSON-RPC 2.0 specification for both requests and responses.
+
+##### Request Format
+```json
+{
+  "jsonrpc": "2.0",
+  "id": <id>,
+  "method": "<method_name>",
+  "params": <params_object>
+}
+```
+
+##### Response Format
+```json
+{
+  "jsonrpc": "2.0",
+  "id": <id>,
+  "result": <result_object>
+}
+```
+
+##### Error Response Format
+```json
+{
+  "jsonrpc": "2.0",
+  "id": <id>,
+  "error": {
+    "code": <error_code>,
+    "message": "<error_message>",
+    "data": <additional_data>
+  }
+}
+```
+
+##### Notification Format (server to client)
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "<notification_name>",
+  "params": <params_object>
+}
+```
+
+#### API Methods
+
+##### topic.get
+Retrieves information about a specific topic.
+
+###### Parameters
+```json
+{
+  "topic_name": "<topic_name>"
+}
+```
+
+###### Response (Success)
+```json
+{
+  "topic_name": "<topic_name>",
+  "filterable": true,
+  "bandwidth_limit": 1024,
+  "metrics": {
+    "dispatched": {
+      "bandwidth": 512,
+      "rate": 2.5
+    },
+    "forwarded": {
+      "bandwidth": 768,
+      "rate": 3.2
+    }
+  }
+}
+```
+
+###### Response (Error)
+```json
+{
+  "code": -32001,
+  "message": "Topic not found"
+}
+```
+
+##### topic.list
+Retrieves a list of all known topics.
+
+###### Parameters
+None or empty object `{}`
+
+###### Response (Success)
+```json
+[
+  {
+    "topic_name": "<topic_name_1>",
+    "filterable": true,
+    "bandwidth_limit": 1024,
+    "metrics": {
+      "dispatched": {
+        "bandwidth": 512,
+        "rate": 2.5
+      },
+      "forwarded": {
+        "bandwidth": 768,
+        "rate": 3.2
+      }
+    }
+  },
+  {
+    "topic_name": "<topic_name_2>",
+    "filterable": false,
+    "bandwidth_limit": null,
+    "metrics": {
+      "dispatched": {
+        "bandwidth": 128,
+        "rate": 0.5
+      },
+      "forwarded": {
+        "bandwidth": 128,
+        "rate": 0.5
+      }
+    }
+  }
+]
+```
+
+##### topic.setBandwidth
+Sets the bandwidth limit for a specific topic.
+
+###### Parameters
+```json
+{
+  "topic_name": "<topic_name>",
+  "bandwidth": 2048
+}
+```
+
+Note: Use null to remove bandwidth limits:
+```json
+{
+  "topic_name": "<topic_name>",
+  "bandwidth": null
+}
+```
+
+###### Response (Success)
+```json
+"ok"
+```
+
+###### Response (Error)
+```json
+{
+  "code": -32001,
+  "message": "Topic not found"
+}
+```
+
+Or
+
+```json
+{
+  "code": -32002,
+  "message": "Topic not filterable"
+}
+```
+
+##### bridge.list
+Retrieves a list of all connected bridges.
+
+###### Parameters
+None or empty object `{}`
+
+###### Response (Success)
+```json
+[
+  {"bridge_id": "bridge1"},
+  {"bridge_id": "bridge2"}
+]
+```
+
+#### Notifications
+
+##### topic.changed
+Sent by the server whenever topic information changes. Has the same format as the response from `topic.get`.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "topic.changed",
+  "params": {
+    "topic_name": "<topic_name>",
+    "filterable": true,
+    "bandwidth_limit": 2048,
+    "metrics": {
+      "dispatched": {
+        "bandwidth": 512,
+        "rate": 2.5
+      },
+      "forwarded": {
+        "bandwidth": 768,
+        "rate": 3.2
+      }
+    }
+  }
+}
+```
+
+##### bridge.attached
+Sent by the server whenever a new bridge connects to the hub.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bridge.attached",
+  "params": {
+    "bridge_id": "bridge1"
+  }
+}
+```
+
+##### bridge.detached
+Sent by the server whenever a bridge disconnects from the hub.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "bridge.detached",
+  "params": {
+    "bridge_id": "bridge1",
+    "reason": "normal"
+  }
+}
+```
+
+#### Error Codes
+
+| Code    | Message                | Description                                       |
+|---------|------------------------|---------------------------------------------------|
+| -32001  | Topic not found        | The specified topic does not exist                |
+| -32002  | Topic not filterable   | The topic cannot have bandwidth limits applied    |
+| -32003  | Invalid bandwidth      | The bandwidth value is invalid                    |
+| -32600  | Invalid request        | The JSON sent is not a valid Request object       |
+| -32601  | Method not found       | The method does not exist / is not available      |
+| -32602  | Invalid params         | Invalid method parameter(s)                       |
+| -32603  | Internal error         | Internal JSON-RPC error                           |
+| -32700  | Parse error            | Invalid JSON was received by the server           |
+
+#### Example Usage Sequence
+
+1. Connect to WebSocket with token authentication
+   ```
+   ws://hub.example.com/ro2erl_hub/ws?token=secret123
+   ```
+
+2. Request list of topics
+   ```json
+   // Client -> Server
+   {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "method": "topic.list",
+     "params": {}
+   }
+
+   // Server -> Client
+   {
+     "jsonrpc": "2.0",
+     "id": 1,
+     "result": [
+       {
+         "topic_name": "/sensor/data",
+         "filterable": true,
+         "bandwidth_limit": 1024,
+         "metrics": {
+           "dispatched": {"bandwidth": 512, "rate": 2.5},
+           "forwarded": {"bandwidth": 768, "rate": 3.2}
+         }
+       }
+     ]
+   }
+   ```
+
+3. Set bandwidth for a topic
+   ```json
+   // Client -> Server
+   {
+     "jsonrpc": "2.0",
+     "id": 2,
+     "method": "topic.setBandwidth",
+     "params": {
+       "topic_name": "/sensor/data",
+       "bandwidth": 2048
+     }
+   }
+
+   // Server -> Client
+   {
+     "jsonrpc": "2.0",
+     "id": 2,
+     "result": "ok"
+   }
+   ```
+
+4. Receive notification when topic changes
+   ```json
+   // Server -> Client (no request needed)
+   {
+     "jsonrpc": "2.0",
+     "method": "topic.changed",
+     "params": {
+       "topic_name": "/sensor/data",
+       "filterable": true,
+       "bandwidth_limit": 2048,
+       "metrics": {
+         "dispatched": {"bandwidth": 600, "rate": 3.0},
+         "forwarded": {"bandwidth": 900, "rate": 3.8}
+       }
+     }
+   }
+   ```
 
 ## Technology Considerations
 
@@ -79,7 +393,7 @@ The data structures exchanged between the frontend and backend will be defined d
 
 ### Backend Integration
 - Cowboy web server integrated within the ro2erl_hub application
-- JSON serialization for data exchange
+- JSON-RPC over WebSockets for real-time data exchange
 - Token validation through the grisp.io framework
 - Direct access to hub's internal state and metrics
 
@@ -101,4 +415,4 @@ The data structures exchanged between the frontend and backend will be defined d
 - Authentication token management interface
 - System diagnostics and troubleshooting tools
 - Backup and restore functionality
-- Hub configuration management 
+- Hub configuration management

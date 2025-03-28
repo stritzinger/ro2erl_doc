@@ -107,6 +107,23 @@ The communication between Bridge and Hub components follows a well-defined API:
    - Hub forwards the message to all connected bridges except the sender
    - Bridge should include current timestamp in milliseconds
 
+4. **Update Topics**
+   ```erlang
+   gen_statem:cast(HubPid, {bridge_update_topics, BridgePid :: pid(), Topics :: #{binary() => #{
+       filterable := boolean(),
+       bandwidth_limit := non_neg_integer() | infinity,
+       metrics := #{
+           dispatched := #{bandwidth := non_neg_integer(), rate := float()},
+           forwarded := #{bandwidth := non_neg_integer(), rate := float()}
+       }
+   }}})
+   ```
+   - Sent by bridge to update the hub about known topics
+   - Topics map includes filterable status, bandwidth limits, and metrics for each topic
+   - Hub uses this information for monitoring and traffic management
+   - Enables the hub to maintain a global view of all topics in the system
+   - Can be sent periodically to keep the hub updated with latest metrics
+
 ##### Hub to Bridge Messages
 1. **Dispatch**
    ```erlang
@@ -115,6 +132,15 @@ The communication between Bridge and Hub components follows a well-defined API:
    - Sent by hub to forward messages from other bridges
    - Bridge should process the message and forward it to its network
    - Timestamp indicates when the original message was sent
+
+2. **Set Topic Bandwidth**
+   ```erlang
+   gen_statem:cast(BridgePid, {hub_set_topic_bandwidth, TopicName :: binary(), Bandwidth :: non_neg_integer() | infinity})
+   ```
+   - Sent by hub to set bandwidth limit for a specific topic on a bridge
+   - Bridge should update its local topic configuration accordingly
+   - Allows the hub to centrally manage bandwidth limits across all bridges
+   - Bandwidth can be set to 'infinity' to remove a limit
 
 #### Reliability
 - Erlang distribution provides built-in reliability mechanisms
@@ -209,6 +235,8 @@ The Bridge component operates on the local network and serves as the entry/exit 
 - Applies message filtering based on Hub-provided rules
 - Supports attachment to multiple Hub nodes simultaneously
 - Forwards messages to all connected Hubs
+- Collects and reports per-topic metrics to connected Hubs
+- Implements bandwidth limiting for filterable topics
 - Future capabilities:
   - Network traffic inspection for ROS2/DDS/RTPS packets
   - Local network traffic generation
@@ -240,6 +268,8 @@ The Hub component runs as a Braid service in the grisp.io cloud platform, packag
 - Monitors client node availability
 - Handles traffic statistics and metrics
 - Manages and distributes traffic shaping rules
+- Receives and aggregates topic metrics from all bridges
+- Centrally controls bandwidth limits for topics across all bridges
 - Provides web interface for monitoring and configuration
 
 #### Connection Management
@@ -266,6 +296,27 @@ The Hub component runs as a Braid service in the grisp.io cloud platform, packag
 - Periodic batch updates to Hub
 - Metrics persistence during disconnection
 - Traffic shaping based on collected metrics
+- Topic-level metrics for both dispatched and forwarded messages
+- Centralized topic bandwidth management from the Hub
+- Global view of all topics and their usage across the system
+
+### Topic Management Flow
+
+1. Bridge collects topic metrics:
+   - Tracks bandwidth usage per topic
+   - Records message rates for dispatched and forwarded messages
+   - Maintains information about filterable status and limits
+
+2. Bridge reports topics to hub:
+   - Periodically sends topic information to all connected hubs
+   - Default update period is 1 second (configurable via `topic_update_period`)
+   - Includes filterable status, bandwidth limits, and metrics
+   - Hub stores the information with the bridge record
+
+3. Hub consolidates topic data:
+   - When topic information is requested, data is consolidated on-demand
+   - For all topics view, all unique topics across bridges are identified efficiently
+   - For single topic view, only bridges with that topic are processed
 
 ## Supported Platforms
 
