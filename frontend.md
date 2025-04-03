@@ -44,6 +44,15 @@ The hub will provide a WebSocket interface with JSON-RPC for the frontend to con
 
 ### WebSocket API
 
+#### Protocol Details
+*   The WebSocket connection implements standard ping/pong mechanism with a configurable ping interval (default: 30000ms) and timeout (default: 60000ms)
+*   Clients MUST respond to ping frames with pong frames within the configured timeout period
+*   The server will close the connection if no pong response is received within the timeout
+*   Each message must be a complete, self-contained JSON-RPC message
+*   Partial or malformed JSON messages will be rejected with error -32700
+*   Upon reconnection, the client must request fresh data using topic.list and bridge.list
+*   The client is responsible for maintaining its own state based on received notifications
+
 #### Authentication
 The WebSocket endpoint will be accessible at:
 ```
@@ -52,9 +61,11 @@ ws://<server>/ro2erl_hub/ws?token=<AUTH_TOKEN>
 
 Where:
 - `<server>` is the host and port of the ro2erl_hub server
-- `<AUTH_TOKEN>` is the secret token configured in the hub's environment variables
+- `<AUTH_TOKEN>` is the secret token configured in the hub's application environment
 
-The token authentication is simple to implement and use, while still providing basic security. The token must match the one configured in the hub for the connection to be established. No additional authentication steps are needed once the WebSocket connection is established.
+The token authentication is simple to implement and use, while still providing basic security:
+*   Connections without a valid token will be rejected with HTTP 401 Unauthorized
+*   Once authenticated, the connection is considered authorized for all subsequent operations
 
 #### JSON-RPC Protocol
 The WebSocket API follows the JSON-RPC 2.0 specification for both requests and responses.
@@ -238,13 +249,13 @@ None or empty object `{}`
 
 #### Notifications
 
-##### topic.changed
+##### topic.updated
 Sent by the server whenever topic information changes. Has the same format as the response from `topic.get`.
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "topic.changed",
+  "method": "topic.updated",
   "params": {
     "topic_name": "<topic_name>",
     "filterable": true,
@@ -364,7 +375,7 @@ Sent by the server whenever a bridge disconnects from the hub.
    // Server -> Client (no request needed)
    {
      "jsonrpc": "2.0",
-     "method": "topic.changed",
+     "method": "topic.updated",
      "params": {
        "topic_name": "/sensor/data",
        "filterable": true,
