@@ -248,6 +248,16 @@ The Bridge component operates on the local network and serves as the entry/exit 
 - For grisp.io framework users, this is handled by grisp_connect
 - ro2erl_bridge does not depend on grisp_connect, making it usable by any Erlang application
 
+#### Direct-connect mode
+- A bridge can advertise `direct_connect = true` when attaching to the hub (extended attach tuple with `Opts` map)
+- The hub manages peer lists and sends `{hub_add_peer, PeerNode, Opts}` / `{hub_del_peer, PeerNode}` to bridges
+- In direct-connect mode, bridges send data-plane traffic directly to peers (no hub proxy); hub still handles metrics and bandwidth control
+- Attach remains backward compatible: `{bridge_attach, BridgeId, BridgePid}` is equivalent to `{bridge_attach, BridgeId, BridgePid, #{}}`
+- The `Opts` map for attach should include at least `direct_connect` (boolean) and `node` (node name); `{bridge_attach, BridgeId, BridgePid}` is treated as an empty map
+- For secure peer setup (when `grisp_connect` is available), the hub should include in `hub_add_peer` `Opts`: `hostname`, `address`, `cookie`, `ca` (PEM), `fingerprint` (cert sha256), and optional `monitor`; bridges can then call `grisp_connect_cluster:join/2` via a connector abstraction (no hard compile-time dependency). Otherwise, fall back to `net_kernel:connect_node/1`
+- In direct-connect mode, the hub must not proxy data-plane: it should ignore/warn on `bridge_dispatch` from direct bridges
+- Peer removal: bridges drop the peer from routing on `{hub_del_peer, PeerNode}` but do not force `disconnect_node/leave` (the connection may be needed elsewhere); rely on node monitoring to mark peers down until the hub removes them
+
 #### Operation Modes
 1. **Dispatch Mode** (Initial Implementation)
    - Receives parsed messages from rosie_rclerl client

@@ -13,19 +13,24 @@ Target-X enables secure and reliable ROS2/DDS communication across distributed r
 ## Architecture Highlights
 
 ```
-[Robot Site A]                     [Cloud]                      [Robot Site B]
-  ROS2/DDS       <---Internet--->  Hub Node     <---Internet--->  ROS2/DDS
-   ^   ^                             ^  ^                           ^   ^
-   |   |                             |  |                           |   |
-   v   v                             |  |                           v   v
-Bridge Node  <--Erlang Distribution--+  +--Erlang Distribution--> Bridge Node
-[Traffic Shaping]                                                [Traffic Shaping]
+[Robot Site A]                       [Cloud]                         [Robot Site B]
+  ROS2/DDS   <--------Internet-----> Hub Node <------Internet-------->  ROS2/DDS
+   ^   ^                               ^  ^                               ^   ^
+   |   |                               |  |                               |   |
+   v   v                               |  |                               v   v
+Bridge Node <--Erlang Distribution---- +  + ----Erlang Distribution--> Bridge Node
+[Traffic Shaping]                       \/                       [Traffic Shaping]
+     ^                         Hub-managed Peer List                        ^
+     |                                  ||                                  |
+     \--------- Direct Bridge-to-Bridge Erlang Distribution ----------------/
+                            (Optional Direct Data Path)
 ```
 
 ## Key Components
 
 - **ro2erl_bridge**: Monitors topics, applies filtering rules, and manages data flow at each robot site
 - **ro2erl_hub**: Coordinates connected bridges, distributes messages, and provides web UI for monitoring and configuration
+- **Direct-connect option**: Bridges can be configured to exchange data directly bridge↔bridge while still reporting metrics to, and receiving control from, the hub
 - **Traffic Shaping**: Intelligently manages bandwidth through configurable rules and topic prioritization
 - **Security**: Leverages TLS encryption and certificate-based authentication via the grisp.io framework
 - **Web Interface**: Provides monitoring, configuration, and rule management capabilities
@@ -54,4 +59,4 @@ Bridge Node  <--Erlang Distribution--+  +--Erlang Distribution--> Bridge Node
 For more detailed information, see:
 
 - [Design Document](design.md) - Comprehensive technical specification and architecture
-- [Frontend Specification](frontend.md) - ro2erl_hub web interface requirements and integration 
+- [Frontend Specification](frontend.md) - ro2erl_hub web interface requirements and integration
